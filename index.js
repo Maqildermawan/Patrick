@@ -11,7 +11,8 @@ const {
     ButtonStyle,
     REST,
     Routes,
-    SlashCommandBuilder
+    SlashCommandBuilder,
+    MessageFlags
 } = require('discord.js');
 const { Connectors } = require('shoukaku');
 const { Kazagumo, Plugins } = require('kazagumo');
@@ -28,7 +29,6 @@ const client = new Client({
 
 const musicPanels = new Map();
 
-// Konfigurasi Node Lavalink Nodes
 const Nodes = [{
     name: process.env.LAVALINK_NAME,
     url: process.env.LAVALINK_URL,
@@ -55,7 +55,6 @@ const kazagumo = new Kazagumo({
     }
 }, new Connectors.DiscordJS(client), Nodes);
 
-// Pendaftaran Slash Commands Lengkap (/play, /skip, /stop, /queue, /volume, /pause, /resume, /loop, /clear, /setup)
 const commands = [
     new SlashCommandBuilder()
     .setName('play')
@@ -64,44 +63,24 @@ const commands = [
         option.setName('query')
         .setDescription('Judul lagu atau link lagu')
         .setRequired(true)),
-    new SlashCommandBuilder()
-    .setName('skip')
-    .setDescription('Melewati lagu yang sedang diputar'),
-    new SlashCommandBuilder()
-    .setName('stop')
-    .setDescription('Menghentikan musik dan mengeluarkan bot dari voice channel'),
-    new SlashCommandBuilder()
-    .setName('pause')
-    .setDescription('Menjeda lagu yang sedang diputar'),
-    new SlashCommandBuilder()
-    .setName('resume')
-    .setDescription('Melanjutkan lagu yang dijeda'),
+    new SlashCommandBuilder().setName('skip').setDescription('Melewati lagu yang sedang diputar'),
+    new SlashCommandBuilder().setName('stop').setDescription('Menghentikan musik dan keluar dari voice channel'),
+    new SlashCommandBuilder().setName('pause').setDescription('Menjeda lagu'),
+    new SlashCommandBuilder().setName('resume').setDescription('Melanjutkan lagu'),
     new SlashCommandBuilder()
     .setName('volume')
-    .setDescription('Mengatur volume suara bot (1 - 100)')
+    .setDescription('Mengatur volume suara (1-100)')
     .addIntegerOption(option =>
-        option.setName('level')
-        .setDescription('Tingkat volume (1-100)')
-        .setRequired(true)
-        .setMinValue(1)
-        .setMaxValue(100)),
+        option.setName('level').setDescription('Tingkat volume').setRequired(true).setMinValue(1).setMaxValue(100)),
     new SlashCommandBuilder()
     .setName('loop')
-    .setDescription('Mengubah mode pengulangan lagu')
+    .setDescription('Mode pengulangan lagu')
     .addStringOption(option =>
-        option.setName('mode')
-        .setDescription('Pilih mode loop')
-        .setRequired(true)
-        .addChoices({ name: 'Off (Mati)', value: 'none' }, { name: 'Track (Ulang Lagu Ini)', value: 'track' }, { name: 'Queue (Ulang Semua Antrean)', value: 'queue' })),
-    new SlashCommandBuilder()
-    .setName('clear')
-    .setDescription('Membersihkan seluruh antrean musik'),
-    new SlashCommandBuilder()
-    .setName('queue')
-    .setDescription('Menampilkan daftar antrean lagu'),
-    new SlashCommandBuilder()
-    .setName('setup')
-    .setDescription('Membuat channel dan panel musik interaktif khusus')
+        option.setName('mode').setDescription('Pilih mode').setRequired(true)
+        .addChoices({ name: 'Off', value: 'none' }, { name: 'Track', value: 'track' }, { name: 'Queue', value: 'queue' })),
+    new SlashCommandBuilder().setName('clear').setDescription('Membersihkan antrean'),
+    new SlashCommandBuilder().setName('queue').setDescription('Menampilkan daftar antrean'),
+    new SlashCommandBuilder().setName('setup').setDescription('Membuat panel kontrol musik khusus')
 ].map(command => command.toJSON());
 
 client.once('ready', async() => {
@@ -109,10 +88,7 @@ client.once('ready', async() => {
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
-        console.log('🔄 Mendaftarkan Slash Commands (/) ...');
-        await rest.put(
-            Routes.applicationCommands(client.user.id), { body: commands },
-        );
+        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
         console.log('✅ Slash Commands berhasil didaftarkan!');
     } catch (error) {
         console.error(error);
@@ -120,9 +96,7 @@ client.once('ready', async() => {
 
     const activities = [
         { name: '/play <lagu> 🎵', type: ActivityType.Listening },
-        { name: 'Bot Video And Music', type: ActivityType.Watching },
-        { name: 'Dev : Alea', type: ActivityType.Listening },
-        { name: 'Create : ELL', type: ActivityType.Watching }
+        { name: 'Bot Video & Music', type: ActivityType.Watching }
     ];
 
     let index = 0;
@@ -133,11 +107,9 @@ client.once('ready', async() => {
     }, 15000);
 });
 
-// Event Lavalink
 kazagumo.shoukaku.on('ready', (name) => console.log(`🟢 Lavalink Node "${name}" terhubung!`));
 kazagumo.shoukaku.on('error', (name, error) => console.error(`🔴 Lavalink Error (${name}):`, error));
 
-// Fungsi Update Panel Musik Dinamis
 async function updateMusicPanel(player, guildId) {
     const channel = client.channels.cache.get(player.textId);
     if (!channel) return;
@@ -152,9 +124,7 @@ async function updateMusicPanel(player, guildId) {
         const currentTrack = player.queue.current;
         const queueList = player.queue.slice(0, 5).map((t, i) => `${i + 1}. **${t.title}** - \`${t.author}\``).join('\n') || 'Tidak ada antrean berikutnya.';
 
-        const embed = new EmbedBuilder()
-            .setColor('#1DB954')
-            .setTitle('Patrick | Music');
+        const embed = new EmbedBuilder().setColor('#1DB954').setTitle('Patrick | Music');
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('music_previous').setEmoji('⏮️').setStyle(ButtonStyle.Secondary),
@@ -187,20 +157,19 @@ kazagumo.on('playerEmpty', (player) => {
     player.destroy();
 });
 
-// Handler Interaksi Slash Commands & Tombol
 client.on('interactionCreate', async(interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName, options, guild, member, channel } = interaction;
 
         if (commandName === 'setup') {
             if (!member.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
-                return interaction.reply({ content: '❌ Kamu memerlukan izin **Manage Channels**!', ephemeral: true });
+                return interaction.reply({ content: '❌ Kamu memerlukan izin **Manage Channels**!', flags: MessageFlags.Ephemeral });
             }
 
             try {
                 const existingChannel = guild.channels.cache.find(c => c.name === 'patric-music');
                 if (existingChannel) {
-                    return interaction.reply({ content: `⚠️ Channel khusus musik sudah ada di <#${existingChannel.id}>!`, ephemeral: true });
+                    return interaction.reply({ content: `⚠️ Channel khusus musik sudah ada di <#${existingChannel.id}>!`, flags: MessageFlags.Ephemeral });
                 }
 
                 const newChannel = await guild.channels.create({
@@ -230,10 +199,10 @@ client.on('interactionCreate', async(interaction) => {
                     messageId: sentMessage.id
                 });
 
-                return interaction.reply({ content: `✅ Berhasil membuat panel kontrol musik di <#${newChannel.id}>!`, ephemeral: true });
+                return interaction.reply({ content: `✅ Berhasil membuat panel kontrol musik di <#${newChannel.id}>!`, flags: MessageFlags.Ephemeral });
             } catch (error) {
                 console.error(error);
-                return interaction.reply({ content: '❌ Terjadi kesalahan saat membuat channel setup.', ephemeral: true });
+                return interaction.reply({ content: '❌ Terjadi kesalahan saat membuat channel setup.', flags: MessageFlags.Ephemeral });
             }
         }
 
@@ -241,9 +210,10 @@ client.on('interactionCreate', async(interaction) => {
             const query = options.getString('query');
             const voiceChannel = member.voice.channel;
 
-            if (!voiceChannel) return interaction.reply({ content: '❌ Kamu harus masuk ke voice channel terlebih dahulu!', ephemeral: true });
-            if (!kazagumo.shoukaku.nodes.size) return interaction.reply({ content: '❌ Server Lavalink sedang offline.', ephemeral: true });
+            if (!voiceChannel) return interaction.reply({ content: '❌ Kamu harus masuk ke voice channel terlebih dahulu!', flags: MessageFlags.Ephemeral });
+            if (!kazagumo.shoukaku.nodes.size) return interaction.reply({ content: '❌ Server Lavalink sedang offline.', flags: MessageFlags.Ephemeral });
 
+            // WAJIB: Mencegah error Unknown interaction (10062) saat proses pencarian memakan waktu
             await interaction.deferReply();
 
             try {
@@ -290,14 +260,14 @@ client.on('interactionCreate', async(interaction) => {
 
         if (commandName === 'skip') {
             const player = kazagumo.players.get(guild.id);
-            if (!player) return interaction.reply({ content: '❌ Tidak ada lagu yang sedang diputar.', ephemeral: true });
+            if (!player) return interaction.reply({ content: '❌ Tidak ada lagu yang sedang diputar.', flags: MessageFlags.Ephemeral });
             player.skip();
             return interaction.reply({ content: '⏭️ Lagu berhasil dilewati.' });
         }
 
         if (commandName === 'stop') {
             const player = kazagumo.players.get(guild.id);
-            if (!player) return interaction.reply({ content: '❌ Bot tidak sedang memutar musik.', ephemeral: true });
+            if (!player) return interaction.reply({ content: '❌ Bot tidak sedang memutar musik.', flags: MessageFlags.Ephemeral });
             player.destroy();
             updateMusicPanel(player, guild.id);
             return interaction.reply({ content: '⏹️ Musik dihentikan dan bot keluar.' });
@@ -305,23 +275,23 @@ client.on('interactionCreate', async(interaction) => {
 
         if (commandName === 'pause') {
             const player = kazagumo.players.get(guild.id);
-            if (!player) return interaction.reply({ content: '❌ Tidak ada musik yang diputar.', ephemeral: true });
-            if (player.paused) return interaction.reply({ content: '⚠️ Musik sudah dalam keadaan dijeda.', ephemeral: true });
+            if (!player) return interaction.reply({ content: '❌ Tidak ada musik yang diputar.', flags: MessageFlags.Ephemeral });
+            if (player.paused) return interaction.reply({ content: '⚠️ Musik sudah dalam keadaan dijeda.', flags: MessageFlags.Ephemeral });
             player.pause(true);
             return interaction.reply({ content: '⏸️ Musik berhasil dijeda.' });
         }
 
         if (commandName === 'resume') {
             const player = kazagumo.players.get(guild.id);
-            if (!player) return interaction.reply({ content: '❌ Tidak ada musik yang diputar.', ephemeral: true });
-            if (!player.paused) return interaction.reply({ content: '⚠️ Musik sedang tidak dijeda.', ephemeral: true });
+            if (!player) return interaction.reply({ content: '❌ Tidak ada musik yang diputar.', flags: MessageFlags.Ephemeral });
+            if (!player.paused) return interaction.reply({ content: '⚠️ Musik sedang tidak dijeda.', flags: MessageFlags.Ephemeral });
             player.pause(false);
             return interaction.reply({ content: '▶️ Musik dilanjutkan kembali.' });
         }
 
         if (commandName === 'volume') {
             const player = kazagumo.players.get(guild.id);
-            if (!player) return interaction.reply({ content: '❌ Bot tidak sedang memutar musik.', ephemeral: true });
+            if (!player) return interaction.reply({ content: '❌ Bot tidak sedang memutar musik.', flags: MessageFlags.Ephemeral });
             const level = options.getInteger('level');
             player.setVolume(level);
             updateMusicPanel(player, guild.id);
@@ -330,7 +300,7 @@ client.on('interactionCreate', async(interaction) => {
 
         if (commandName === 'loop') {
             const player = kazagumo.players.get(guild.id);
-            if (!player) return interaction.reply({ content: '❌ Bot tidak sedang memutar musik.', ephemeral: true });
+            if (!player) return interaction.reply({ content: '❌ Bot tidak sedang memutar musik.', flags: MessageFlags.Ephemeral });
             const mode = options.getString('mode');
             player.setLoop(mode);
             return interaction.reply({ content: `🔁 Mode loop diatur ke: **${mode.toUpperCase()}**` });
@@ -338,7 +308,7 @@ client.on('interactionCreate', async(interaction) => {
 
         if (commandName === 'clear') {
             const player = kazagumo.players.get(guild.id);
-            if (!player || !player.queue.length) return interaction.reply({ content: '❌ Antrean kosong.', ephemeral: true });
+            if (!player || !player.queue.length) return interaction.reply({ content: '❌ Antrean kosong.', flags: MessageFlags.Ephemeral });
             player.queue.clear();
             updateMusicPanel(player, guild.id);
             return interaction.reply({ content: '🗑️ Daftar antrean berhasil dibersihkan.' });
@@ -346,54 +316,52 @@ client.on('interactionCreate', async(interaction) => {
 
         if (commandName === 'queue') {
             const player = kazagumo.players.get(guild.id);
-            if (!player || !player.queue.current) return interaction.reply({ content: '❌ Antrean kosong.', ephemeral: true });
+            if (!player || !player.queue.current) return interaction.reply({ content: '❌ Antrean kosong.', flags: MessageFlags.Ephemeral });
             const queueList = player.queue.slice(0, 10).map((t, i) => `${i + 1}. **${t.title}**`).join('\n');
-            return interaction.reply({ content: `**Sedang Diputar:** ${player.queue.current.title}\n\n**Antrean Berikutnya:**\n${queueList || 'Tidak ada'}`, ephemeral: true });
+            return interaction.reply({ content: `**Sedang Diputar:** ${player.queue.current.title}\n\n**Antrean Berikutnya:**\n${queueList || 'Tidak ada'}`, flags: MessageFlags.Ephemeral });
         }
     }
 
-    // Handler Tombol Panel Interaktif
     if (interaction.isButton()) {
         const player = kazagumo.players.get(interaction.guildId);
-        if (!player) return interaction.reply({ content: '❌ Bot tidak sedang memutar musik!', ephemeral: true });
+        if (!player) return interaction.reply({ content: '❌ Bot tidak sedang memutar musik!', flags: MessageFlags.Ephemeral });
 
         const memberVoice = interaction.member.voice.channel;
         if (!memberVoice || memberVoice.id !== player.voiceId) {
-            return interaction.reply({ content: '❌ Kamu harus berada di voice channel yang sama!', ephemeral: true });
+            return interaction.reply({ content: '❌ Kamu harus berada di voice channel yang sama!', flags: MessageFlags.Ephemeral });
         }
 
         if (interaction.customId === 'music_skip') {
             player.skip();
-            await interaction.reply({ content: '⏭️ Lagu dilewati!', ephemeral: true });
+            await interaction.reply({ content: '⏭️ Lagu dilewati!', flags: MessageFlags.Ephemeral });
         } else if (interaction.customId === 'music_pause') {
             if (player.paused) {
                 player.pause(false);
-                await interaction.reply({ content: '▶️ Musik dilanjutkan!', ephemeral: true });
+                await interaction.reply({ content: '▶️ Musik dilanjutkan!', flags: MessageFlags.Ephemeral });
             } else {
                 player.pause(true);
-                await interaction.reply({ content: '⏸️ Musik dijeda.', ephemeral: true });
+                await interaction.reply({ content: '⏸️ Musik dijeda.', flags: MessageFlags.Ephemeral });
             }
         } else if (interaction.customId === 'music_stop') {
             player.destroy();
             updateMusicPanel(player, interaction.guildId);
-            await interaction.reply({ content: '⏹️ Musik dihentikan.', ephemeral: true });
+            await interaction.reply({ content: '⏹️ Musik dihentikan.', flags: MessageFlags.Ephemeral });
         } else if (interaction.customId === 'music_loop') {
             const currentLoop = player.loop;
             if (currentLoop === 'track') {
                 player.setLoop('queue');
-                await interaction.reply({ content: '🔁 Mode Loop: **Queue**', ephemeral: true });
+                await interaction.reply({ content: '🔁 Mode Loop: **Queue**', flags: MessageFlags.Ephemeral });
             } else if (currentLoop === 'queue') {
                 player.setLoop('none');
-                await interaction.reply({ content: '🔁 Mode Loop: **Off**', ephemeral: true });
+                await interaction.reply({ content: '🔁 Mode Loop: **Off**', flags: MessageFlags.Ephemeral });
             } else {
                 player.setLoop('track');
-                await interaction.reply({ content: '🔁 Mode Loop: **Track**', ephemeral: true });
+                await interaction.reply({ content: '🔁 Mode Loop: **Track**', flags: MessageFlags.Ephemeral });
             }
         }
     }
 });
 
-// Fitur Ketik Langsung di Channel "patric-music" Tanpa Prefix Slash
 client.on('messageCreate', async(message) => {
     if (message.author.bot || !message.guild || message.channel.name !== 'patric-music') return;
 
