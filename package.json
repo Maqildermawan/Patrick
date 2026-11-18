@@ -1,0 +1,15 @@
+{
+    "name": "discord-music-slash-bot",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js"
+    },
+    "dependencies": {
+        "discord.js": "^14.16.3",
+        "dotenv": "^16.4.5",
+        "kazagumo": "^3.2.2",
+        "kazagumo-spotify": "^2.1.1",
+        "shoukaku": "^4.1.1"
+    }
+}
