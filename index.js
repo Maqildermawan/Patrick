@@ -168,7 +168,7 @@ async function updateMusicPanel(player, guildId, forceDefault = false) {
         );
 
         if (currentTrack) {
-            embed.setDescription(`🎶 **Sedang Memutar:**\n**[${currentTrack.title}](${currentTrack.uri})**\n<:smember:1570799095994392607> **Artis:** ${currentTrack.author}\n<:sheadpone:1570799073160724650> **Request oleh:** ${currentTrack.requester.username || currentTrack.requester}\n<:sspeak:1570799131520147458> **Volume:** ${player.volume}%\n\n📜 **DAFTAR ANTREAN:**\n${queueList}`)
+            embed.setDescription(`🎶 **Sedang Memutar:**\n**[${currentTrack.title}](${currentTrack.uri})**\n<:smember:1570799095994392607> **Artis:** ${currentTrack.author}\n<:sheadpone:1570799073160724650> **Request oleh:** ${currentTrack.requester.username || currentTrack.requester}\n<:sspeak:1570799131520147458> **Volume:** ${player.volume}%\n\n<:sfolder2:1570799060431020082> **DAFTAR ANTREAN:**\n${queueList}`)
                 .setImage(currentTrack.thumbnail || 'https://media.discordapp.net/attachments/1007588463006203986/1123054895885451374/urlittleboy.gif');
         } else {
             // Kembali ke mode default (standby GIF) ketika kosong / stop
