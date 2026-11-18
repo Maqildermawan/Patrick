@@ -211,13 +211,13 @@ client.on('interactionCreate', async(interaction) => {
             }
 
             try {
-                const existingChannel = guild.channels.cache.find(c => c.name === 'patric-music');
+                const existingChannel = guild.channels.cache.find(c => c.name === '🧩│ゝpatric・music');
                 if (existingChannel) {
                     return sendAutoDeleteMessage(interaction, { content: `<:sinfo:1570799084338413648> Channel khusus musik sudah ada di <#${existingChannel.id}>!`, flags: MessageFlags.Ephemeral }, 4000);
                 }
 
                 const newChannel = await guild.channels.create({
-                    name: 'patric-music',
+                    name: '🧩│ゝpatric・music',
                     type: ChannelType.GuildText,
                     topic: 'Music Request Channel for Patrick'
                 });
@@ -261,7 +261,7 @@ client.on('interactionCreate', async(interaction) => {
 
             try {
                 let textChannelId = channel.id;
-                const musicChan = guild.channels.cache.find(c => c.name === 'patric-music');
+                const musicChan = guild.channels.cache.find(c => c.name === '🧩│ゝpatric・music');
                 if (musicChan) textChannelId = musicChan.id;
 
                 const player = await kazagumo.createPlayer({
@@ -409,9 +409,9 @@ client.on('interactionCreate', async(interaction) => {
     }
 });
 
-// FITUR AUTO-CLEANUP DI CHANNEL KHUSUS "patric-music"
+// FITUR AUTO-CLEANUP DI CHANNEL KHUSUS "🧩│ゝpatric・music"
 client.on('messageCreate', async(message) => {
-    if (message.author.bot || !message.guild || message.channel.name !== 'patric-music') return;
+    if (message.author.bot || !message.guild || message.channel.name !== '🧩│ゝpatric・music') return;
 
     const query = message.content.trim();
 
