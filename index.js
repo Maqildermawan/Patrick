@@ -110,7 +110,7 @@ client.once('ready', async() => {
 kazagumo.shoukaku.on('ready', (name) => console.log(`🟢 Lavalink Node "${name}" terhubung!`));
 kazagumo.shoukaku.on('error', (name, error) => console.error(`🔴 Lavalink Error (${name}):`, error));
 
-// Fungsi pembantu untuk auto-hapus pesan bot setelah beberapa detik
+// Fungsi pembantu untuk auto-hapus pesan balasan bot
 async function sendAutoDeleteMessage(interactionOrChannel, content, time = 4000, isEdit = false) {
     try {
         let sentMsg;
@@ -392,14 +392,24 @@ client.on('interactionCreate', async(interaction) => {
     }
 });
 
-// FITUR KETIK LANGSUNG DI CHANNEL KHUSUS "patric-music" TANPA PERLU /play
+// FITUR AUTO-CLEANUP DI CHANNEL KHUSUS "patric-music"
 client.on('messageCreate', async(message) => {
     if (message.author.bot || !message.guild || message.channel.name !== 'patric-music') return;
 
     const query = message.content.trim();
-    if (!query) return;
 
-    // Hapus pesan teks user agar channel tetap bersih dan estetik
+    // 1. Jika pesan berupa LAMPIRAN / GAMBAR / STICKER / FOTO tanpa teks lagu yang valid, langsung hapus
+    if (!query && message.attachments.size > 0) {
+        try { await message.delete(); } catch (e) {}
+        return sendAutoDeleteMessage(message.channel, `❌ <@${message.author.id}>, kirim gambar/file tidak diizinkan di channel musik ini!`, 4000);
+    }
+
+    if (!query) {
+        try { await message.delete(); } catch (e) {}
+        return;
+    }
+
+    // 2. Hapus pesan teks user (baik judul lagu maupun chat sembarang) agar channel bersih
     try { await message.delete(); } catch (e) {}
 
     const voiceChannel = message.member.voice.channel;
@@ -428,8 +438,10 @@ client.on('messageCreate', async(message) => {
         }
 
         const result = await kazagumo.search(query, { requester: message.author });
+
+        // 3. Jika teks yang diketik BUKAN lagu / tidak ditemukan (dianggap chat ngobrol biasa), hapus dan beri peringatan singkat
         if (!result.tracks.length) {
-            return sendAutoDeleteMessage(message.channel, `❌ <@${message.author.id}>, lagu tidak ditemukan!`, 4000);
+            return sendAutoDeleteMessage(message.channel, `❌ <@${message.author.id}>, lagu **"${query}"** tidak ditemukan atau dilarang chat selain request musik!`, 4000);
         }
 
         if (result.type === 'PLAYLIST') {
