@@ -136,19 +136,24 @@ async function sendAutoDeleteMessage(interactionOrChannel, content, time = 4000,
     }
 }
 
-async function updateMusicPanel(player, guildId) {
-    const channel = client.channels.cache.get(player.textId);
-    if (!channel) return;
+// Fungsi Update Panel Musik Dinamis (Support Reset ke Default)
+async function updateMusicPanel(player, guildId, forceDefault = false) {
+    const channel = client.channels.cache.get(player ? player.textId : null);
 
     const panelData = musicPanels.get(guildId);
     if (!panelData) return;
 
+    const targetChannel = channel || client.channels.cache.get(panelData.channelId);
+    if (!targetChannel) return;
+
     try {
-        const message = await channel.messages.fetch(panelData.messageId);
+        const message = await targetChannel.messages.fetch(panelData.messageId);
         if (!message) return;
 
-        const currentTrack = player.queue.current;
-        const queueList = player.queue.slice(0, 5).map((t, i) => `${i + 1}. **${t.title}** - \`${t.author}\``).join('\n') || 'Tidak ada antrean berikutnya.';
+        const currentTrack = forceDefault ? null : (player ? player.queue.current : null);
+        const queueList = (player && player.queue && player.queue.length > 0) ?
+            player.queue.slice(0, 5).map((t, i) => `${i + 1}. **${t.title}** - \`${t.author}\``).join('\n') :
+            'Tidak ada antrean berikutnya.';
 
         const embed = new EmbedBuilder().setColor('#1DB954').setTitle('Patrick | Music');
 
@@ -161,9 +166,10 @@ async function updateMusicPanel(player, guildId) {
         );
 
         if (currentTrack) {
-            embed.setDescription(`🎶 **Sedang Memutar:**\n**[${currentTrack.title}](${currentTrack.uri})**\n👤 **Artis:** ${currentTrack.author}\n🎧 **Request oleh:** ${currentTrack.requester}\n🔊 **Volume:** ${player.volume}%\n\n📜 **DAFTAR ANTREAN:**\n${queueList}`)
+            embed.setDescription(`🎶 **Sedang Memutar:**\n**[${currentTrack.title}](${currentTrack.uri})**\n👤 **Artis:** ${currentTrack.author}\n🎧 **Request oleh:** ${currentTrack.requester.username || currentTrack.requester}\n🔊 **Volume:** ${player.volume}%\n\n📜 **DAFTAR ANTREAN:**\n${queueList}`)
                 .setImage(currentTrack.thumbnail || 'https://media.discordapp.net/attachments/1007588463006203986/1123054895885451374/urlittleboy.gif');
         } else {
+            // Kembali ke mode default (standby GIF) ketika kosong / stop
             embed.setDescription('Join a Voice Channel and Type Song Link/Name to Play')
                 .setImage('https://media.discordapp.net/attachments/1007588463006203986/1123054895885451374/urlittleboy.gif');
         }
@@ -176,15 +182,20 @@ async function updateMusicPanel(player, guildId) {
 
 kazagumo.on('playerStart', (player, track) => updateMusicPanel(player, player.guildId));
 kazagumo.on('playerEnd', (player) => updateMusicPanel(player, player.guildId));
+
 kazagumo.on('playerEmpty', (player) => {
-    updateMusicPanel(player, player.guildId);
-    const channel = client.channels.cache.get(player.textId);
+    const guildId = player.guildId;
+    const textId = player.textId;
+
+    player.destroy();
+    updateMusicPanel(null, guildId, true);
+
+    const channel = client.channels.cache.get(textId);
     if (channel) {
         channel.send('✅ Antrean lagu habis, keluar dari voice channel.').then(msg => {
             setTimeout(() => msg.delete().catch(() => {}), 4000);
         });
     }
-    player.destroy();
 });
 
 // Handler Slash Commands & Button Interactions
@@ -298,8 +309,11 @@ client.on('interactionCreate', async(interaction) => {
         if (commandName === 'stop') {
             const player = kazagumo.players.get(guild.id);
             if (!player) return sendAutoDeleteMessage(interaction, { content: '❌ Bot tidak sedang memutar musik.', flags: MessageFlags.Ephemeral }, 4000);
+
+            const guildId = guild.id;
             player.destroy();
-            updateMusicPanel(player, guild.id);
+            updateMusicPanel(null, guildId, true);
+
             return sendAutoDeleteMessage(interaction, '⏹️ Musik dihentikan dan bot keluar.', 4000);
         }
 
@@ -373,8 +387,9 @@ client.on('interactionCreate', async(interaction) => {
                 await interaction.reply({ content: '⏸️ Musik dijeda!', flags: MessageFlags.Ephemeral });
             }
         } else if (interaction.customId === 'music_stop') {
+            const guildId = interaction.guildId;
             player.destroy();
-            updateMusicPanel(player, interaction.guildId);
+            updateMusicPanel(null, guildId, true);
             await interaction.reply({ content: '⏹️ Musik dihentikan.', flags: MessageFlags.Ephemeral });
         } else if (interaction.customId === 'music_loop') {
             const currentLoop = player.loop;
@@ -398,7 +413,6 @@ client.on('messageCreate', async(message) => {
 
     const query = message.content.trim();
 
-    // 1. Jika pesan berupa LAMPIRAN / GAMBAR / STICKER / FOTO tanpa teks lagu yang valid, langsung hapus
     if (!query && message.attachments.size > 0) {
         try { await message.delete(); } catch (e) {}
         return sendAutoDeleteMessage(message.channel, `❌ <@${message.author.id}>, kirim gambar/file tidak diizinkan di channel musik ini!`, 4000);
@@ -409,7 +423,6 @@ client.on('messageCreate', async(message) => {
         return;
     }
 
-    // 2. Hapus pesan teks user (baik judul lagu maupun chat sembarang) agar channel bersih
     try { await message.delete(); } catch (e) {}
 
     const voiceChannel = message.member.voice.channel;
@@ -439,7 +452,6 @@ client.on('messageCreate', async(message) => {
 
         const result = await kazagumo.search(query, { requester: message.author });
 
-        // 3. Jika teks yang diketik BUKAN lagu / tidak ditemukan (dianggap chat ngobrol biasa), hapus dan beri peringatan singkat
         if (!result.tracks.length) {
             return sendAutoDeleteMessage(message.channel, `❌ <@${message.author.id}>, lagu **"${query}"** tidak ditemukan atau dilarang chat selain request musik!`, 4000);
         }
